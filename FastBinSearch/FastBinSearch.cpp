@@ -1,7 +1,6 @@
 #include "FastBinSearch.h"
 #include <vector>
 #include <immintrin.h> 
-#include <iostream>
 
 unsigned char gBinMap[256] = {
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -88,24 +87,26 @@ std::vector<size_t> FastSearchPattern::searchAll(void* pBuffer, size_t bufSize)
 	std::vector<size_t> retList;
 	size_t searchEnd = bufSize - sigLen;
 	__m128i sigHead = _mm_set1_epi8(firstSig);
-	for (size_t i = 0; i < searchEnd; i = i + 16) {
-		__m128i startBuf = _mm_loadu_si128((__m128i*)((char*)pBuffer + i));
+	for (size_t i = 0; i <= searchEnd; i = i + 16) {
+		unsigned char* pSearchBuf = (unsigned char*)pBuffer + i;
+		__m128i startBuf = _mm_loadu_si128((__m128i*)pSearchBuf);
 		__m128i curComp = _mm_cmpeq_epi8(sigHead, startBuf);
 		unsigned long comMask = _mm_movemask_epi8(curComp);
 		unsigned long idxCom;
 		while (_BitScanForward(&idxCom, comMask)) {
-			bool bFindFlag = true;
+			bool bFind = true;
+			unsigned char* pComBuf = pSearchBuf + 1 + idxCom;
 			for (unsigned int n = 0; n < ruleList.size(); ++n) {
-				__m128i compareBuf1 = _mm_loadu_si128((__m128i*)((char*)pBuffer + i + 1 + idxCom));
+				__m128i compareBuf1 = _mm_loadu_si128((__m128i*)(pComBuf + (n << 4)));
 				__m128i compareBuf2 = _mm_loadu_si128((__m128i*)ruleList[n].bytes);
 				__m128i xmm3 = _mm_cmpeq_epi8(compareBuf1, compareBuf2);
 				unsigned long mask = _mm_movemask_epi8(xmm3);
 				if ((mask | ruleList[n].mask) != 0xFFFF) {
-					bFindFlag = false;
+					bFind = false;
 					break;
 				}
 			}
-			if (bFindFlag) {
+			if (bFind) {
 				retList.push_back(i + idxCom);
 			}
 			comMask &= comMask - 1;
